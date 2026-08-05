@@ -1,0 +1,47 @@
+{
+  "run": {
+    "system": {
+      "n_elevators": 16,
+      "n_floors": 25,
+      "capacity": 10,
+      "dwell": 2,
+      "init_floor": 1
+    },
+    "n_passengers": 2708,
+    "n_delivered": 2708,
+    "n_ticks": 2331,
+    "scheduler": "look+zone_based",
+    "workload": {
+      "pattern": "down_peak",
+      "lambda": 3,
+      "seed": 42
+    }
+  },
+  "wait": {
+    "min": 0,
+    "max": 1978,
+    "avg": 254.38,
+    "p90": 1061.3,
+    "p95": 1431.3
+  },
+  "travel": {
+    "min": 3,
+    "max": 44,
+    "avg": 23.12
+  },
+  "total": {
+    "min": 3,
+    "max": 2004,
+    "avg": 277.5
+  },
+  "efficiency": {
+    "total_distance": 8904,
+    "stops_made": 1652,
+    "utilization_rho": 0.3242,
+    "throughput": 1.1617
+  },
+  "pooling": {
+    "distance_per_passenger": 3.288,
+    "passengers_per_stop": 1.6392
+  }
+}

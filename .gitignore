@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# virtual env
+.venv/
+venv/
+
+# ad-hoc test artifacts (the reproducible demo runs in outputs/demo/ ARE committed
+# as example outputs; scratch samples are not)
+outputs/samples/
+outputs/run/
+outputs/cli_test/
+outputs/cli_kkr/
+outputs/_test_tmp/
+
+# KKR take-home prompt — proprietary interview material, do NOT publish
+Take_home_Elevator.pdf
+*.pdf
+
+# Phase 2 (secrets never committed)
+.streamlit/secrets.toml
+.env

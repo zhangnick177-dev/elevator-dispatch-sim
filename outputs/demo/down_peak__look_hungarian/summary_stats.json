@@ -1,0 +1,47 @@
+{
+  "run": {
+    "system": {
+      "n_elevators": 16,
+      "n_floors": 25,
+      "capacity": 10,
+      "dwell": 2,
+      "init_floor": 1
+    },
+    "n_passengers": 2708,
+    "n_delivered": 2708,
+    "n_ticks": 1342,
+    "scheduler": "look+hungarian",
+    "workload": {
+      "pattern": "down_peak",
+      "lambda": 3,
+      "seed": 42
+    }
+  },
+  "wait": {
+    "min": 0,
+    "max": 1115,
+    "avg": 100.47,
+    "p90": 375.3,
+    "p95": 588.95
+  },
+  "travel": {
+    "min": 3,
+    "max": 66,
+    "avg": 38.62
+  },
+  "total": {
+    "min": 3,
+    "max": 1141,
+    "avg": 139.08
+  },
+  "efficiency": {
+    "total_distance": 12456,
+    "stops_made": 1988,
+    "utilization_rho": 0.7596,
+    "throughput": 2.0179
+  },
+  "pooling": {
+    "distance_per_passenger": 4.5997,
+    "passengers_per_stop": 1.3622
+  }
+}
