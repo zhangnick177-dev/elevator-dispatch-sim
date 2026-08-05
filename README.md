@@ -205,4 +205,4 @@ outputs can later be redirected (e.g. to a database) without touching the simula
 
 ## Time spent
 
-_~[fill in] hours: design & problem analysis, implementation, testing, and this write-up._
+~20–25 hours (problem framing & design, implementation, testing, and this write-up).
