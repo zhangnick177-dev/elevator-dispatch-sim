@@ -13,6 +13,7 @@ Usage:  python run_demo.py
 from __future__ import annotations
 
 import csv
+import sys
 import warnings
 from pathlib import Path
 
@@ -62,7 +63,50 @@ def _make_dispatch(name):
     raise ValueError(name)
 
 
+def _write_comparison_chart(rows, base: Path) -> None:
+    """Grouped bar chart of avg TOTAL time (the objective) by policy, per pattern.
+    Best DISPATCH policy per pattern is outlined; the FCFS motion baseline is hatched.
+    Folded into run_demo so `python run_demo.py` reproduces the whole output folder."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    by = {(r["pattern"], r["scheduler"]): r for r in rows}
+    dispatch5 = ["look+round_robin", "look+nearest_car", "look+zone_based",
+                 "look+cost_function", "look+hungarian"]
+    order = dispatch5 + ["fcfs+round_robin"]
+    short = {"look+round_robin": "round-robin", "look+nearest_car": "nearest-car",
+             "look+zone_based": "zone-based", "look+cost_function": "cost-function",
+             "look+hungarian": "hungarian", "fcfs+round_robin": "fcfs+rr\n(motion base)"}
+    colors = {"look+round_robin": "#9e9e9e", "look+nearest_car": "#4C78A8",
+              "look+zone_based": "#B279A2", "look+cost_function": "#54A24B",
+              "look+hungarian": "#2E7D32", "fcfs+round_robin": "#E45756"}
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.8))
+    fig.suptitle("Average TOTAL time per passenger (wait + travel = the objective)",
+                 fontsize=12.5, fontweight="bold")
+    for ax, pat in zip(axes, PATTERNS):
+        vals = [by[(pat, s)]["total_avg"] for s in order]
+        bars = ax.bar(range(len(order)), vals, color=[colors[s] for s in order], edgecolor="white")
+        bars[-1].set_hatch("//")                        # FCFS = motion baseline (different axis)
+        win = vals[:5].index(min(vals[:5]))             # best DISPATCH policy (of the 5 LOOK)
+        bars[win].set_edgecolor("black"); bars[win].set_linewidth(2.2)
+        for i, v in enumerate(vals):
+            ax.text(i, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8)
+        ax.set_title(pat)
+        ax.set_xticks(range(len(order)))
+        ax.set_xticklabels([short[s] for s in order], rotation=40, ha="right", fontsize=8.5)
+        ax.set_ylabel("avg total time (ticks)")
+        ax.margins(y=0.18)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(base / "comparison_chart.png", dpi=110)
+    plt.close(fig)
+
+
 def main() -> None:
+    # output folder: optional CLI arg (e.g. outputs/demo_arrival_process), else the default
+    base = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("outputs/demo")
+
     rows = []
     for pattern in PATTERNS:
         # one trace per pattern; all schedulers run on it (mini-CRN)
@@ -78,10 +122,11 @@ def main() -> None:
             sched = f"{motion_name}+{dispatch_name}"
             m = compute(res, run_meta={"scheduler": sched,
                                        "workload": {"pattern": pattern, "lambda": LAM, "seed": SEED}})
-            outdir = Path("outputs/demo") / f"{pattern}__{motion_name}_{dispatch_name}"
+            outdir = base / f"{pattern}__{motion_name}_{dispatch_name}"
             CsvWriter().write(res, m, outdir)
+            # 3-panel distributions: wait, total, AND the arrival process (Poisson check)
             plot_distributions(m.per_passenger, outdir / "distributions.png",
-                               title=f"{sched}, {pattern} lambda={LAM}")
+                               title=f"{sched}, {pattern} lambda={LAM}", include_arrival=True)
 
             s = m.summary
             rows.append({
@@ -96,13 +141,15 @@ def main() -> None:
             })
             print(f"  {pattern:10} {sched:20} avgW={s['wait']['avg']:>6}  rho={s['efficiency']['utilization_rho']}")
 
-    # write the illustrative comparison table (single-seed; the rigorous grid is Phase 2)
-    comp = Path("outputs/demo/comparison.csv")
+    # write the illustrative comparison table + chart (single-seed; rigorous grid is Phase 2)
+    base.mkdir(parents=True, exist_ok=True)
+    comp = base / "comparison.csv"
     with comp.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
-    print(f"\n18 runs written to outputs/demo/  (+ comparison.csv)")
+    _write_comparison_chart(rows, base)
+    print(f"\n18 runs written to {base}/  (+ comparison.csv + comparison_chart.png)")
 
 
 if __name__ == "__main__":
