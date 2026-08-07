@@ -56,7 +56,7 @@ Requires Python 3.10+ and `numpy`, `scipy`, `pandas`, `matplotlib` (see `require
 | `--dispatch` | `cost_function` | `round_robin` / `nearest_car` / `zone_based` / `cost_function` / `hungarian` |
 | `--aging` | `0.1` | anti-starvation weight (`0` = off) |
 | `--w-dist/--w-dir/--w-load/--w-eta` | `1 / 2 / 0.5 / 1.5` | cost-function weights |
-| `--plot` | — | render `distributions.png` |
+| `--plot` | — | render `distributions.png` (wait, total & arrival-process/Poisson histograms) |
 
 **Outputs per run:** `positions_log.csv` (one row per tick), `passengers.csv` (one row per
 passenger), `summary_stats.json` (aggregate metrics), and a console summary table.

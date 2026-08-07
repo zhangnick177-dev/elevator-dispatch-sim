@@ -88,7 +88,8 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--w-eta", type=float, default=1.5)
     # output
     p.add_argument("--output", default="outputs/run", help="output directory")
-    p.add_argument("--plot", action="store_true", help="render distributions.png")
+    p.add_argument("--plot", action="store_true",
+                   help="render distributions.png (wait, total, and arrival-process panels)")
     return p.parse_args(argv)
 
 
@@ -122,7 +123,7 @@ def main(argv=None) -> None:
     CsvWriter().write(result, metrics, args.output)
     if args.plot:
         plot_distributions(metrics.per_passenger, Path(args.output) / "distributions.png",
-                           title=sched_name)
+                           title=sched_name, include_arrival=True)
     print(f"\nwrote outputs to {args.output}/")
 
 
