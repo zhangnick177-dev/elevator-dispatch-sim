@@ -1,6 +1,6 @@
 # Elevator System Simulation — Project Plan
 
-**Source:** KKR take-home (`Take_home_Elevator.pdf`)
+**Source:** The Company take-home (`Take_home_Elevator.pdf`)
 **Goal:** A discrete-time simulation of a multi-elevator *Destination Dispatch* system that serves all requests, minimizes per-passenger `total_time = wait_time + travel_time`, and honors capacity/direction constraints.
 
 ---
@@ -26,7 +26,7 @@
 
 ## 2. Scope & assumptions (state these in the README)
 
-- **Input is a contract, not a dataset.** The `time,id,source,dest` format is the interface; KKR is not expected to supply a dataset. We validate on hand-built traces and characterize on self-generated synthetic loads.
+- **Input is a contract, not a dataset.** The `time,id,source,dest` format is the interface; The Company is not expected to supply a dataset. We validate on hand-built traces and characterize on self-generated synthetic loads.
 - **Time model**: fixed-tick discrete-time. Each tick, every elevator moves at most one floor; boarding/alighting happens on arrival at a floor.
 - **Door dwell**: a parameter — **`dwell` ticks per *stop*** (per stop, **not** per passenger), **default 0**. The engine supports any value at no added cost (`dwell=0` → instant boarding; `dwell≥1` → a doors-open phase). Documented as a knob.
 - **Wait time** = ticks from request submission until pickup (boarding at source).
@@ -49,9 +49,9 @@ elevator_sim/
     fcfs.py          # arrival-order motion — naive baseline, used only to show the gap
   dispatch/        # AXIS 2 — which elevator serves a new request (HIGH-leverage)
     base.py          # DispatchPolicy interface
-    round_robin.py   # KKR-named — rotation baseline
-    nearest_car.py   # KKR-named — closest suitable elevator (classic heuristic)
-    zone_based.py    # KKR-named — sectoring (each car owns a floor zone)
+    round_robin.py   # The Company-named — rotation baseline
+    nearest_car.py   # The Company-named — closest suitable elevator (classic heuristic)
+    zone_based.py    # The Company-named — sectoring (each car owns a floor zone)
     cost_function.py # weighted-ETA — destination-dispatch star (expected winner)
     aging.py         # anti-starvation priority boost (composable with any dispatch)
   metrics.py       # wait/travel/total, fairness percentiles, ρ, distance/pooling — compute only
@@ -94,7 +94,7 @@ time,id,source,dest
   - print an **end-of-load summary** — e.g. `"loaded 997, skipped 3 (2 source==dest, 1 out-of-range)"`;
   - optional **`strict=True`** flag to raise instead (for tests/CI).
   - Rationale: robust to messy input *without* silently computing stats on a truncated dataset. Documented in the README.
-- Any conforming file runs — including one KKR might supply.
+- Any conforming file runs — including one the Company might supply.
 
 ---
 
@@ -102,7 +102,7 @@ time,id,source,dest
 
 Produces a trace matching the CSV contract (`time,id,source,dest`) from stochastic inputs.
 
-**Output form:** `generate(...)` **returns a `list[Request]` in memory** (consumed directly by `run_sim`); a separate **`to_csv()` helper** writes that same trace to disk when a file is wanted. Use `to_csv()` for **single / demo / showcase runs** (e.g. the KKR full run — a reproducible input artifact alongside the positions log) — but **not** for the Phase-1 experiment grid, where traces stay in-memory and regenerate from seed (§5.1) to avoid file explosion.
+**Output form:** `generate(...)` **returns a `list[Request]` in memory** (consumed directly by `run_sim`); a separate **`to_csv()` helper** writes that same trace to disk when a file is wanted. Use `to_csv()` for **single / demo / showcase runs** (e.g. the Company full run — a reproducible input artifact alongside the positions log) — but **not** for the Phase-1 experiment grid, where traces stay in-memory and regenerate from seed (§5.1) to avoid file explosion.
 
 **Phase 2 note:** the experiment grid never persists traces — each is regenerated from its seed on demand (the seed reproduces any trace exactly). Only the averaged results (`summary_mean.json` per config) are written.
 
@@ -231,9 +231,9 @@ A scheduler = **one motion policy × one dispatch policy**. We fix motion at LOO
 ### Axis 2 — Dispatch policy (the comparison — high-leverage)
 | Dispatch | How it assigns a new request | Role |
 |---|---|---|
-| **Round-robin** | rotate across elevators | KKR-named; naive load-balancer baseline |
-| **Nearest-Car** | closest suitable (direction-compatible) elevator | KKR-named; classic heuristic |
-| **Zone-based** | building split into `n_zones` banks; request → zone by `max(source,dest)`, nearest car within zone | KKR-named; good when zones match traffic, fragments a fungible fleet |
+| **Round-robin** | rotate across elevators | The Company-named; naive load-balancer baseline |
+| **Nearest-Car** | closest suitable (direction-compatible) elevator | The Company-named; classic heuristic |
+| **Zone-based** | building split into `n_zones` banks; request → zone by `max(source,dest)`, nearest car within zone | The Company-named; good when zones match traffic, fragments a fungible fleet |
 | **Cost-function / ETA** *(star)* | `min` over `distance + direction-penalty + load + est-completion` | modern destination-dispatch; expected winner |
 | **Optimal batch (Hungarian)** | globally-optimal assignment of the whole pending batch (`linear_sum_assignment`) | the ceiling / benchmark (**Phase 1**); multi-request via **column replication** |
 
@@ -244,7 +244,7 @@ A scheduler = **one motion policy × one dispatch policy**. We fix motion at LOO
 ### Scheduler parameters — when & how input
 - **Features vs. weights:** the cost terms (`distance`, `direction_penalty`, `load`, `est_completion`) are **computed from live state** each call; the **weights** are the configurable parameters. (Parameterized policies: zone-based [boundaries], cost-function [4 weights], Hungarian [weights + penalty], aging [`age_weight`]; round-robin & nearest-car take none.)
 - **At construction, before the run** — e.g. `CostFunction(w_dist=1.0, w_dir=2.0, w_load=0.5, w_eta=1.5)`; **fixed for the whole run** (same values every tick).
-- **Single run (Phase 1):** supplied via **CLI args / config / defaults** (`--dispatch cost_function --w-dist 1.0 …`) so KKR can try their own values.
+- **Single run (Phase 1):** supplied via **CLI args / config / defaults** (`--dispatch cost_function --w-dist 1.0 …`) so The Company can try their own values.
 - **Grid (Phase 2):** set once per policy, held **fixed** across the grid — unless a parameter's effect is being studied, then it becomes a sweep axis (weights don't change the trace, so CRN still applies).
 - Defaults confirmed at §12.
 
@@ -310,7 +310,7 @@ Pooling is **not** a separate implemented axis here — it is **emergent**: `cap
 - **`plots.py` renders** — `plot_distributions(passengers)` draws histograms of **`wait_time`** and **`total_time`**, saved as PNG in the **same run-output folder** as `passengers.csv`. Called by `cli.py` (single run only). Phase 2 may add **optional** static mean-bar comparison plots (also `plots.py`). matplotlib lives only in `plots.py`, never in `metrics.py`.
 
 **Files** (one run):
-- `positions_log.csv` — one row per **tick**; positions of all elevators (KKR required).
+- `positions_log.csv` — one row per **tick**; positions of all elevators (The Company required).
 - `passengers.csv` — one row per **passenger** (`id, source, dest, submit/pickup/dropoff ticks, wait, travel, total, elevator`); the granular source for distributions & percentiles.
 - `summary_stats.json` + **console table** — aggregate metrics (min/max/avg, p90/p95/max wait, ρ).
 - `distributions.png` — histograms of **`wait_time`** and **`total_time`** (rendered from `passengers.csv` by `plots.py`, saved beside it); the single-run "notable observation" artifact.
@@ -331,9 +331,9 @@ Phase 1 validates the engine with **single runs** — **no grid, no replication*
 **B. Smoke / demo runs (one per scheduler × pattern)** — **single runs, one seed, one representative λ.** **6 scheduler configs** (LOOK + {round-robin, nearest-car, zone-based, cost-function, Hungarian} + **FCFS-motion** baseline) **× 3 patterns = 18 runs.** Purpose:
 - **Smoke-test** that every scheduler runs end-to-end without error;
 - **Generate example outputs** for the README **"observations"** section;
-- Let KKR see the tool run under different policies/patterns (incl. the FCFS→LOOK motion gap).
+- Let The Company see the tool run under different policies/patterns (incl. the FCFS→LOOK motion gap).
 
-**Save outputs** to a demo folder for KKR to browse — one subfolder per run:
+**Save outputs** to a demo folder for The Company to browse — one subfolder per run:
 `outputs/demo/{pattern}__{motion}_{dispatch}/` → `positions_log.csv`, `passengers.csv`, `summary_stats.json`, `distributions.png`.
 *(Optional: a tiny script collects the 18 `summary_stats.json` into one **illustrative** comparison CSV for the README — single-seed, no error bars; the rigorous version is §16.)*
 
@@ -347,7 +347,7 @@ Implementation: **generate one trace per pattern** (seed 42, §12 defaults) and 
 
 ## 11. Deliverables — Phase 1 (the Aug-9 submission)
 
-The KKR-required submission. **Phase 1 only** — the Phase 2 replicated study (local mean summaries) is in §16.
+The Company-required submission. **Phase 1 only** — the Phase 2 replicated study (local mean summaries) is in §16.
 
 - **Public GitHub repo** with the Python code (pure core + CLI + tests) and a **`requirements.txt`** (`scipy`, `numpy`, `pandas`, `matplotlib`) for clone-and-run.
 - **README.md** containing:
@@ -412,7 +412,7 @@ The elevator is a disguise for a whole class of online-dispatch problems. Leadin
 
 ---
 
-## 14. Open questions to raise with KKR (optional, shows rigor)
+## 14. Open questions to raise with The Company (optional, shows rigor)
 
 - Optimize for **average** latency or **tail/fairness**? (changes the algorithm)
 - Is assignment strictly **irrevocable**, or is **re-dispatch** allowed?
@@ -435,7 +435,7 @@ The elevator is a disguise for a whole class of online-dispatch problems. Leadin
           (Phase 1)       grid (Phase 2)     (Phase 3)
 ```
 
-### Phase 1 — KKR deliverable (graded)
+### Phase 1 — The Company deliverable (graded)
 - Clean, self-contained, **clone-and-run**; CSV in / CSV+JSON out; **no DB, no UI**.
 - Builds the **pure core** that Phases 2–3 reuse.
 - This is what's evaluated — keep it focused and pristine.
@@ -452,7 +452,7 @@ The elevator is a disguise for a whole class of online-dispatch problems. Leadin
 - **Keep live runs small/illustrative** — the Cloud container is resource-limited, so heavy runs stay precomputed; the live button does a short, lightweight sim that finishes in seconds and appends to the `runs` table.
 
 ### Repo strategy
-- **Keep the KKR deliverable pristine.** The Phase-2 grid is small and local, so it can live in the **same repo** (`experiments.py` at the root, or under `/extras`, or a branch) — no companion repo needed. The reviewer still lands on the clean core; the grid is just one more script that reuses it.
+- **Keep the Company deliverable pristine.** The Phase-2 grid is small and local, so it can live in the **same repo** (`experiments.py` at the root, or under `/extras`, or a branch) — no companion repo needed. The reviewer still lands on the clean core; the grid is just one more script that reuses it.
 
 ---
 
