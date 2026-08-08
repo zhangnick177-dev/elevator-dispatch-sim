@@ -19,6 +19,9 @@ outputs/_test_tmp/
 Take_home_Elevator.pdf
 *.pdf
 
+# Interview presentation deck — keep local, not in the public repo
+*.pptx
+
 # Phase 2 (secrets never committed)
 .streamlit/secrets.toml
 .env

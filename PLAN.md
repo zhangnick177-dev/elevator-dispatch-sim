@@ -57,12 +57,11 @@ elevator_sim/
   metrics.py       # wait/travel/total, fairness percentiles, ρ, distance/pooling — compute only
   plots.py         # single-run histograms (wait + total); matplotlib lives ONLY here
   io/
-    base.py            # ResultsWriter interface — CSV / Supabase are swappable adapters
+    base.py            # ResultsWriter interface (CsvWriter; core stays I/O-agnostic)
     writers.py         # CsvWriter: positions_log.csv + passengers.csv + summary_stats.json
     trace_loader.py    # read requests from CSV (the input contract)
     generator.py       # Poisson(λ) + origin-destination synthetic loads
-                       # (Phase 2 adds supabase_writer.py implementing ResultsWriter)
-  experiments.py   # runs the grid, aggregates over seeds → writes results table (NO plots — Phase 2 Streamlit visualizes)
+  experiments.py   # (Phase 2) 100 seeds × 18 configs → average → summary_mean.json per config
   cli.py           # single run: engine → metrics → writers → plots (histograms)
 tests/
   test_correctness.py  # the tiny hand-checked scenarios
@@ -105,7 +104,7 @@ Produces a trace matching the CSV contract (`time,id,source,dest`) from stochast
 
 **Output form:** `generate(...)` **returns a `list[Request]` in memory** (consumed directly by `run_sim`); a separate **`to_csv()` helper** writes that same trace to disk when a file is wanted. Use `to_csv()` for **single / demo / showcase runs** (e.g. the KKR full run — a reproducible input artifact alongside the positions log) — but **not** for the Phase-1 experiment grid, where traces stay in-memory and regenerate from seed (§5.1) to avoid file explosion.
 
-**Phase 2 option:** for the extended experiment grid (Milestone 4 running against Supabase), traces *may* be persisted to **Supabase** — but note this is **redundant with regenerating from seed** (the seed already reproduces any trace), so do it only as a deliberate choice: the decoupled generator→DB→worker pipeline, or live trace replay in the dashboard. Default stays: persist **results + config manifest (params + seed)**, regenerate traces on demand.
+**Phase 2 note:** the experiment grid never persists traces — each is regenerated from its seed on demand (the seed reproduces any trace exactly). Only the averaged results (`summary_mean.json` per config) are written.
 
 A trace is **two independent random parts**: **WHEN** each request arrives (Poisson) and **WHERE** it goes (origin-destination).
 
@@ -307,8 +306,8 @@ Pooling is **not** a separate implemented axis here — it is **emergent**: `cap
 
 **Compute vs. save vs. render (separation of concerns):**
 - **`metrics.py` computes** — returns `{per_passenger records, summary stats}`; **no file I/O, no plotting**.
-- **`io/writers.py` saves** (behind a `ResultsWriter` interface) — Phase 2 swaps `CsvWriter` → `SupabaseWriter` with the metrics/engine core **untouched**.
-- **`plots.py` renders** — `plot_distributions(passengers)` draws histograms of **`wait_time`** and **`total_time`**, saved as PNG in the **same run-output folder** as `passengers.csv`. Called by `cli.py` (single run only). **No plotting in the grid** — Phase 2 Streamlit handles all grid visualization (§10). matplotlib lives only in `plots.py`, never in `metrics.py`.
+- **`io/writers.py` saves** (behind a `ResultsWriter` interface) — Phase 2 reuses `CsvWriter`/JSON to write the averaged `summary_mean.json`; **no new adapter**, metrics/engine core **untouched**.
+- **`plots.py` renders** — `plot_distributions(passengers)` draws histograms of **`wait_time`** and **`total_time`**, saved as PNG in the **same run-output folder** as `passengers.csv`. Called by `cli.py` (single run only). Phase 2 may add **optional** static mean-bar comparison plots (also `plots.py`). matplotlib lives only in `plots.py`, never in `metrics.py`.
 
 **Files** (one run):
 - `positions_log.csv` — one row per **tick**; positions of all elevators (KKR required).
@@ -342,13 +341,13 @@ All non-varying parameters use the **§12 confirmed defaults** (the office-build
 
 Implementation: **generate one trace per pattern** (seed 42, §12 defaults) and run **all 6 schedulers on it** (mini-CRN → fair within-pattern comparison) → **3 traces, 18 runs**. Invoke `cli.py` in a tiny loop — **not** `experiments.py`. No replication, no aggregation, no error bars. *(`generator.py` in its simple single-trace mode is **Phase 1**; the CRN grid `experiments.py` is **Phase 2 / §16**.)*
 
-> These are *illustrative* single runs. The **rigorous replicated sweep** (patterns × λ-sweep × 5 policies × many seeds, CRN, mean ± SE, the cliff/comparison views) is **Phase 2 → §16**.
+> These are *illustrative* single runs. The **averaged study** (18 configs × 100 seeds, CRN, per-config mean summaries) is **Phase 2 → §16**.
 
 ---
 
 ## 11. Deliverables — Phase 1 (the Aug-9 submission)
 
-The KKR-required submission. **Phase 1 only** — Phase 2 deliverables (dashboard, presentation visuals) are in §16.
+The KKR-required submission. **Phase 1 only** — the Phase 2 replicated study (local mean summaries) is in §16.
 
 - **Public GitHub repo** with the Python code (pure core + CLI + tests) and a **`requirements.txt`** (`scipy`, `numpy`, `pandas`, `matplotlib`) for clone-and-run.
 - **README.md** containing:
@@ -358,10 +357,10 @@ The KKR-required submission. **Phase 1 only** — Phase 2 deliverables (dashboar
   - **Time spent.**
   - **Assumptions / simplifications / trade-offs** (see §2).
   - **What we'd improve with more time** (incl. the adaptive batching window, §13).
-  - **Observations** — a short, caveated section from the §10-B smoke/demo runs (illustrative single runs; full study in the Phase 2 dashboard).
+  - **Observations** — a short, caveated section from the §10-B smoke/demo runs (illustrative single runs; the averaged study is Phase 2, §16).
 - **Example outputs** committed for one showcase run: `positions_log.csv`, `passengers.csv`, `summary_stats.json`, `distributions.png`.
 
-*(Phase 2 deliverables — experiment grid, Supabase, Streamlit dashboard, and the follow-up presentation — are in §16.)*
+*(Phase 2 — the local replicated experiment grid (`experiments.py` → mean summaries) — is in §16.)*
 
 ---
 
@@ -373,14 +372,14 @@ The KKR-required submission. **Phase 1 only** — Phase 2 deliverables (dashboar
 > - **Workload:** `λ = 3`, `duration = 900`, `seed = 42`, `pattern = up_peak` *(smoke runs §10-B vary pattern over up_peak / down_peak / uniform)*
 > - **Scheduler:** cost-function weights `w_dist=1.0, w_dir=2.0, w_load=0.5, w_eta=1.5`; `age_weight = 0.1` *(aging on, gentle)*; motion = LOOK
 > - **Zone-based:** `n_zones = 3` (low / mid / high — ~8 floors, ~5 cars each); assign a request to the zone containing **`max(source, dest)`** (the non-lobby floor — robust across up/down/uniform), nearest car **within** the zone. **Hungarian penalty** = large finite constant
-> - **Experiment (Phase 2 / §16):** replications `R`, `base_seed`, `λ` sweep values — confirm when building the grid
+> - **Experiment (Phase 2 / §16):** `R = 100` replications · `base_seed = 42` · fixed λ (no sweep — a λ-sweep is optional further work)
 
 1. **[P1] Models + generator** — `models.py` (`Request` / `Passenger` / `Elevator` / enums) + `generator.py` (simple single-trace: Poisson + OD, §5) → **generate + eyeball a sample office trace.** *(Models first — the generator produces `Request`s. Independent of the engine → clean starting point + a realistic test fixture.)*
 2. **[P1] Engine core** — `engine.py` tick loop + **LOOK motion** + **round-robin dispatch** + `trace_loader.py` + `io/writers.py` (positions log) → run on **the sample trace *and* the prompt's 3-row example.** *(LOOK triggers the §7 review gate.)*
 3. **[P1] Metrics + outputs** — `metrics.py` (wait/travel/total, percentiles, ρ, distance/pooling) + writers (`passengers.csv`, `summary_stats.json` + console table) + `plots.py` (wait & total histograms).
 4. **[P1] Full dispatch ladder + tests** — **nearest-car, zone-based, cost-function, Hungarian** (all on LOOK) + **FCFS-motion** baseline + **aging** + `cli.py` + the ~4 correctness tests (§10-A). *(Each scheduler triggers a §7 review; now testable on the realistic trace where policies actually differ.)*
 5. **[P1] Smoke/demo runs + README** — the 18 runs (§10-B) → example outputs + README (how-to-run, assumptions, observations). **→ completes the Aug-9 submission.**
-6. **[P2 — §16] Experiment grid + dashboard** — CRN grid `experiments.py` → results table → Supabase → Streamlit (follow-up presentation); + optional bonus (express elevators).
+6. **[P2 — §16] Experiment grid** — `experiments.py`: 100 seeds × 18 configs → average each metric → `summary_mean.json` per config (`outputs/experiment/`); **local, no dashboard**. + optional bonus (express elevators).
 
 ---
 
@@ -396,7 +395,7 @@ This is an **online, capacity-constrained dispatch problem** — the same abstra
   - *Why it matters:* in `ρ = λ/(cμ)` the "λ" should be the rate of **jobs the servers actually process**, and an elevator's unit of work is a **trip** (a *batch* of riders), not a single passenger — so `λ_trip`, not the raw request rate, is what drives ρ.
   - *Example* (`λ_request = 3` passengers/tick): good pooling ≈ 10 riders/trip → `λ_trip = 3/10 = 0.3` trips/tick; poor pooling ≈ 5/trip → `λ_trip = 3/5 = 0.6` — **double the trip demand → higher ρ → worse wait.** Same passenger rate, different trip demand: *that's the whole pooling insight in one variable.*
   - *Analytical only:* "trip" is fuzzy under continuous LOOK, so the sim **measures ρ directly** and uses `distance-per-passenger` for pooling (§9). `λ_trip` lives here to *explain why* pooling lowers ρ — it is **not** a computed metric.
-- **Theory ↔ measurement bridge**: this framing *predicts*; the sim *measures*. ρ, the wait-vs-λ **cliff**, and the pooling effect all surface in the runs (§9 metrics; §16 λ-sweep). We never plug into a queueing formula to *run* the sim — we run it and *observe* the behavior the theory explains.
+- **Theory ↔ measurement bridge**: this framing *predicts*; the sim *measures*. ρ and the pooling effect surface directly in the runs (§9 metrics; §16 averaged study). The wait-vs-λ **cliff** would need a λ-sweep — noted as optional further work (§16.5). We never plug into a queueing formula to *run* the sim — we run it and *observe* the behavior the theory explains.
 
 ### Domain mappings (presentation hook — same math, three domains)
 The elevator is a disguise for a whole class of online-dispatch problems. Leading with this shows you understand the problem *class*, not just this instance:
@@ -432,8 +431,8 @@ The elevator is a disguise for a whole class of online-dispatch problems. Leadin
             │  input: a trace  →  output: metrics     │
             └───────────────────────────────────────┘
                  ▲              ▲               ▲
-          CSV adapter     Supabase adapter   Agent/live adapter
-          (Phase 1)       (Phase 2)          (Phase 3)
+          CSV in/out      experiments.py     Agent / live
+          (Phase 1)       grid (Phase 2)     (Phase 3)
 ```
 
 ### Phase 1 — KKR deliverable (graded)
@@ -441,75 +440,49 @@ The elevator is a disguise for a whole class of online-dispatch problems. Leadin
 - Builds the **pure core** that Phases 2–3 reuse.
 - This is what's evaluated — keep it focused and pristine.
 
-### Phase 2 — Streamlit dashboard + Supabase (deployed for in-person demo)
-> **Full grid + results-schema + dashboard spec: §16.** (This is the overview.)
-- **Why Supabase (not local files):** Streamlit Community Cloud has an **ephemeral filesystem** — files written by the deployed app are wiped on restart/redeploy. Any dynamic/persisted data needs **external hosted storage**. Since Phase 3 adds live runs that must persist, Supabase (hosted Postgres, free tier, Python client) is the right foundation now.
-- **Pattern — precompute then read:** run the heavy experiment grid **offline on the laptop** → write **results + config manifest** to Supabase → the deployed dashboard just **reads and visualizes** (fast, reliable). Don't run big grids on the Cloud's ~1 GB single-process container.
-- **Store:** results table (metrics per run) + config manifest (params + seed). **Not raw traces** — regenerate from seed (store the seed for audit if needed).
-- **Secrets:** Supabase URL/key in `st.secrets` (+ gitignored `.streamlit/secrets.toml`) — **never** hardcode keys in the public repo.
-- **Bonus:** the Streamlit comparison dashboard doubles as the **presentation deliverable** ("visualizations in your walkthrough").
+### Phase 2 — Local replicated experiment grid (mean summaries)
+> **Full spec: §16.** (This is the overview.)
+- **What:** `experiments.py` runs the 18 smoke configs across **100 seeds**, averages each metric, and writes one `summary_mean.json` per config to `outputs/experiment/`.
+- **Why:** turns the single-seed Phase-1 observations into robust averaged results — the policy comparison no longer hinges on one random trace.
+- **Fully local** — no database, no dashboard, no deploy. Reuses the Phase-1 core (`generate → run_sim → compute`) unchanged; **no new adapters**.
+- **Optional:** a combined comparison CSV / static mean-bar plots. **Further work:** a λ-sweep (the utilization cliff) and SE / error bars.
 
 ### Phase 3 — Live UI agent
 - **Define "agent" first:** (A) *live-run controller* — pick config in the UI → run a sim live → stream progress → write to a `runs` table; or (B) *LLM agent* — natural language ("compare nearest-car vs cost-function under morning rush") → translate to an experiment config → run → report. (B) is a much larger scope (NL→config layer, orchestration, guardrails).
 - **Keep live runs small/illustrative** — the Cloud container is resource-limited, so heavy runs stay precomputed; the live button does a short, lightweight sim that finishes in seconds and appends to the `runs` table.
 
 ### Repo strategy
-- **Keep the KKR deliverable pristine and easy to find.** Preferred: a **separate companion repo** (`elevator-sim-lab`) for the Streamlit/Supabase/agent work, **linked from the deliverable's README** as "further work." Alternative: one repo with extensions isolated in a branch or `/extras`. The reviewer must land on the clean core, not the dashboard.
-
-### Deployment topology
-```
-Laptop (heavy compute)                 Streamlit Cloud (light)
-  generator + core  ──►  Supabase  ◄──   dashboard reads results
-  run big grid            (results,        + small live runs write back
-  write results           config, runs)    (Phase 3)
-```
+- **Keep the KKR deliverable pristine.** The Phase-2 grid is small and local, so it can live in the **same repo** (`experiments.py` at the root, or under `/extras`, or a branch) — no companion repo needed. The reviewer still lands on the clean core; the grid is just one more script that reuses it.
 
 ---
 
-## 16. Phase 2 — Experiment grid, Supabase & dashboard
+## 16. Phase 2 — Local replicated experiment grid (mean summary)
 
-The rigorous study + the deployed showcase for the follow-up presentation. **Builds on the Phase 1 core unchanged** (only adapters added — see §15). **Not part of the Aug-9 submission.**
+Upgrades the single-seed Phase-1 observations into **averaged results** by running each config across many seeds and averaging — so the policy comparison isn't a fluke of one trace. **Fully local: no database, no dashboard, no deploy.** Builds on the Phase 1 core unchanged. **Not part of the Aug-9 submission.**
 
-### 16.1 Characterization grid (`experiments.py`)
-The replicated parameter sweep. *Vary one axis at a time* so each view isolates one variable. Uses the §5.1 **CRN** loop (generate once per `(pattern, λ, replicate)`; run all schedulers on the same trace).
+### 16.1 The grid (`experiments.py`)
+- **Configs:** the same **18** as the smoke runs (§10-B) — 6 schedulers (5 dispatch on LOOK + FCFS-motion baseline) × 3 patterns.
+- **Fixed workload:** λ=3, duration=900, office defaults (§12). *(Single λ — no λ-sweep in this scope; see §16.5.)*
+- **Replications:** **R = 100** seeds; `base_seed = 42`.
+- **Mini-CRN:** for each `(pattern, replication)` generate the trace **once** and run all 6 schedulers on it. Seed per `(pattern, replication)` via `default_rng([base_seed, PATTERN_ID[pattern], r])`.
+- **Total:** 100 × 18 = **1,800 runs** (~15–25 min locally, single-threaded).
 
-- **Traffic patterns**: up_peak, down_peak, uniform → **3**
-- **Arrival rates λ**: ~**5** values, low → saturating, to expose the utilization cliff.
-- **Replications**: **5–10** seeds per config → **mean ± SE** (error bars).
+**The 6 schedulers** (motion fixed at LOOK; FCFS baseline shows the motion gap):
+1. LOOK + Round-robin  2. LOOK + Nearest-car  3. LOOK + Zone-based
+4. LOOK + Cost-function *(expected winner)*  5. LOOK + Hungarian *(ceiling)*  6. FCFS + Round-robin *(baseline)*
 
-**Main study — motion FIXED at LOOK, vary dispatch (5 policies):**
-1. LOOK + Round-robin
-2. LOOK + Nearest-car
-3. LOOK + Zone-based
-4. LOOK + Cost-function *(expected winner)*
-5. LOOK + Hungarian *(optimal-batch benchmark — the ceiling)*
+### 16.2 Aggregation → mean summary per config (Option A output)
+- For each of the 18 configs, collect the 100 per-run summaries from `metrics.compute()` and **average every metric field** across the 100 runs.
+- Write one **`summary_mean.json`** per config to `outputs/experiment/{pattern}__{motion}_{dispatch}/summary_mean.json`.
+- **Same schema as `summary_stats.json`**, every value = the mean over 100 runs, plus `"n_replications": 100`. (Mean only — no SE for now.)
+- Aggregation note: `avg` / `ρ` / throughput / pooling average cleanly; `p90`/`p95` = the typical tail; `min`/`max` = the typical best/worst (noisier).
 
-**Baseline — one naive reference (to show motion matters):**
-6. FCFS-motion + Round-robin → compare vs. config 1 (dispatch fixed, motion FCFS→LOOK)
+### 16.3 Optional add-ons (not required)
+- A combined **comparison CSV** (18 rows × key metrics) for quick side-by-side.
+- Static **comparison plots** (matplotlib mean bars) via `plots.py`.
 
-→ **6 scheduler configs** (one-axis-at-a-time, not the full cross product). Compute is minutes, not a bottleneck (~1,500 runs ≈ 3–8 min single-threaded; parallelizable).
+### 16.4 Architecture fit
+`experiments.py` just loops the existing core: `generate → run_sim → compute` → accumulate → average → write. **No new adapters — `CsvWriter`/JSON reused, the metrics/engine core is untouched.** Runnable with `python experiments.py`; lives in the repo (or `/extras`).
 
-### 16.2 Results table (what's persisted)
-One row per run = **identity + metrics** (so batches never collide — the `base_seed` point from §5.1):
-`base_seed, pattern, λ, replicate, motion, dispatch, weights…, n_elevators, capacity, dwell, n_floors, duration | wait_{min,max,avg,p90,p95}, total_{min,max,avg}, ρ, throughput, total_distance, stops, distance_per_passenger, passengers_per_stop`
-(= the `summary_stats.json` `run` block + metrics, flattened to columns.)
-
-### 16.3 Storage — Supabase
-- **`SupabaseWriter`** implements the same `ResultsWriter` interface (§3/§9) → the metrics/engine core is **untouched**.
-- **Precompute offline, read online** (§15): run the grid on the laptop → write the results table to Supabase → the deployed dashboard reads it. Don't run big grids on the Cloud container.
-- Store **results + config manifest**, not raw traces (regenerate from seed).
-- Secrets in `st.secrets` — **never** in the public repo.
-
-### 16.4 Streamlit dashboard (the visualizations)
-Replaces the old "matplotlib PNGs." The dashboard reads the results table and renders **interactive views** (filters for pattern / λ / policy):
-1. **Wait vs. λ** — the `1/(1−ρ)` cliff.
-2. **Scheduler comparison** — avg total_time (+ error bars) across the 6 configs.
-3. **Fairness vs. efficiency** — max/p95 wait vs. distance-per-passenger.
-4. **Per-pattern behavior** — up_peak vs. down_peak vs. uniform.
-
-*(Optional live-run button = Phase 3, §15.)*
-
-### 16.5 Phase 2 deliverables
-- **Companion repo** (`elevator-sim-lab`) — grid + Supabase + Streamlit, **linked from the Phase 1 README** as "further work."
-- **Deployed Streamlit dashboard** (Streamlit Cloud) — the presentation visuals.
-- **Ready for the follow-up presentation** (KKR's follow-up meeting).
+### 16.5 Dropped vs. the original Phase-2 concept (all optional future work)
+❌ Supabase (external storage) · ❌ Streamlit dashboard (deployed/interactive viz) · ❌ `SupabaseWriter` / secrets / companion deployed repo · ❌ the **λ-sweep** and `1/(1−ρ)` cliff study · ❌ SE / error bars.

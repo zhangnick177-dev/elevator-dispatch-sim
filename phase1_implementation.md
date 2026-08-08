@@ -74,8 +74,8 @@
 
 ---
 
-## M6 — [Phase 2, NOT Aug-9] Grid + dashboard
-CRN grid `experiments.py` → results table → Supabase → Streamlit.  → **`§16`** (own checklist when we get there).
+## M6 — [Phase 2, NOT Aug-9] Local experiment grid
+`experiments.py`: 100 seeds × 18 configs (mini-CRN) → average each metric → `summary_mean.json` per config in `outputs/experiment/`. Local, mean-only, no dashboard.  → **`§16`** (own checklist when we get there).
 
 ---
 

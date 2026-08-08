@@ -166,9 +166,10 @@ riders, so one car attracted 500+ passengers — fixed with committed-load balan
   round-robin there.
 - **Weight tuning.** The cost-function weights are hand-set; a grid search on the metrics would
   tune them per traffic pattern.
-- **A rigorous, replicated study + dashboard.** The observations here are single-seed. The next
-  step is a parameter sweep (λ × pattern × policy × many seeds, common random numbers) with
-  mean ± error bars, surfaced in an interactive dashboard.
+- **A replicated study.** The observations here are single-seed. The next step is `experiments.py` —
+  run the 18 configs across ~100 seeds (common random numbers) and average each metric into a
+  per-config `summary_mean.json`, so the comparison is robust rather than one trace's luck.
+  (Further: add error bars and a λ-sweep to expose the utilization cliff.)
 
 ---
 

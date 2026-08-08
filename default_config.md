@@ -51,7 +51,7 @@ DEFAULTS = {
 |---|---|---|
 | motion | **LOOK** | fixed (low-leverage, near-solved) |
 | dispatch | *(varies)* | the 5 policies — smoke runs sweep them |
-| cost weights | `w_dist=1.0, w_dir=2.0, w_load=0.5, w_eta=1.5` | provisional; tunable (grid-searchable in Phase 2) |
+| cost weights | `w_dist=1.0, w_dir=2.0, w_load=0.5, w_eta=1.5` | provisional; tunable (weight grid-search = further work) |
 | `age_weight` | **0.1** | aging **on but gentle** (mild tail-reducer; ~10 ticks of wait ≈ 1 floor of preference). `0` = off, `1` = moderate. |
 | `n_zones` | **3** | low/mid/high (~8 floors, ~5 cars each); assign by zone of `max(source,dest)`, nearest car within zone — robust across up/down/uniform |
 | Hungarian penalty | large finite constant | for forbidden pairings — **never** `inf` (scipy infeasibility) |
@@ -106,4 +106,4 @@ Workflow: run once with the defaults → read ρ → nudge `λ` into the band. T
 - Encoded as a `DEFAULTS` config (dataclass defaults / dict).
 - **Single runs / smoke runs** use them; **CLI overrides** any (`--lambda 4 --capacity 12 …`) so KKR can experiment.
 - **Smoke runs (§10-B)** hold all defaults fixed and vary only **pattern × scheduler** (18 runs).
-- **Phase 2 grid (§16)** sweeps `λ` (and replications `R`, `base_seed`) — those experiment values are confirmed when building the grid, not here.
+- **Phase 2 grid (§16)** replicates the same 18 configs across **`R = 100` seeds** (`base_seed = 42`) at **fixed λ**, and averages each metric into `summary_mean.json` per config. (A λ-sweep is optional further work.)
